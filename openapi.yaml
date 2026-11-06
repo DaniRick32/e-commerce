@@ -1,0 +1,486 @@
+openapi: 3.0.3
+
+info:
+  title: E-commerce API
+  version: 1.0.0
+  description: |
+    REST API for the E-commerce demo application.
+
+    **Authentication:** call `/api/auth/register` or `/api/auth/login`, then send the
+    returned token as `Authorization: Bearer <token>` on protected endpoints.
+  contact:
+    name: E-commerce
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: Registration and login
+  - name: Users
+    description: Authenticated user profile
+  - name: Products
+    description: Product catalogue management
+
+paths:
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: Creates a user account and returns a JWT. Email is stored trimmed and lowercased.
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              email: user@example.com
+              password: secret123
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation failed (missing email/password, invalid email, short password)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A user with this email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in
+      description: Validates credentials and returns a JWT.
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: user@example.com
+              password: secret123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/me:
+    get:
+      tags: [Users]
+      summary: Get the current user
+      description: Returns the profile of the user identified by the bearer token.
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/products:
+    get:
+      tags: [Products]
+      summary: List all products
+      operationId: getProducts
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Product list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Products]
+      summary: Create a product
+      operationId: createProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+            example:
+              name: Wireless Mouse
+              description: Ergonomic wireless mouse with USB receiver
+              price: 24.99
+              stock: 50
+              categoryId: 1
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A product with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/products/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+
+    patch:
+      tags: [Products]
+      summary: Partially update a product
+      description: |
+        Updates only the fields included in the request body.
+        Omitted or `null` fields are left unchanged.
+      operationId: updateProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpdateRequest'
+            example:
+              price: 19.99
+              stock: 25
+      responses:
+        '200':
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '400':
+          description: Validation failed (for example a blank name)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product or category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A product with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Products]
+      summary: Delete a product
+      operationId: deleteProduct
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Product deleted
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT returned by `/api/auth/register` or `/api/auth/login`.
+
+  parameters:
+    ProductId:
+      name: id
+      in: path
+      required: true
+      description: Product identifier
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 1
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: secret123
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          example: secret123
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT access token
+          example: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIn0.signature
+        tokenType:
+          type: string
+          example: Bearer
+        userId:
+          type: integer
+          format: int64
+          example: 1
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        role:
+          $ref: '#/components/schemas/Role'
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        role:
+          $ref: '#/components/schemas/Role'
+
+    Role:
+      type: string
+      enum: [USER, ADMIN]
+      example: USER
+
+    ProductRequest:
+      type: object
+      required: [name, price]
+      properties:
+        name:
+          type: string
+          maxLength: 150
+          example: Wireless Mouse
+        description:
+          type: string
+          nullable: true
+          example: Ergonomic wireless mouse with USB receiver
+        price:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 99999999.99
+          description: Amount with at most 2 decimal places
+          example: 24.99
+        stock:
+          type: integer
+          format: int32
+          minimum: 0
+          default: 0
+          example: 50
+        categoryId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Existing category id, or null for no category
+          example: 1
+
+    ProductUpdateRequest:
+      type: object
+      description: All fields are optional; only provided (non-null) fields are updated.
+      properties:
+        name:
+          type: string
+          maxLength: 150
+          example: Wireless Mouse
+        description:
+          type: string
+          nullable: true
+          example: Updated description
+        price:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 99999999.99
+          description: Amount with at most 2 decimal places
+          example: 19.99
+        stock:
+          type: integer
+          format: int32
+          minimum: 0
+          example: 25
+        categoryId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Existing category id. Null or omitted leaves the category unchanged.
+          example: 1
+
+    ProductResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: Wireless Mouse
+        description:
+          type: string
+          nullable: true
+          example: Ergonomic wireless mouse with USB receiver
+        price:
+          type: number
+          format: double
+          example: 24.99
+        stock:
+          type: integer
+          format: int32
+          example: 50
+        categoryId:
+          type: integer
+          format: int64
+          nullable: true
+          example: 1
+        categoryName:
+          type: string
+          nullable: true
+          example: Electronics
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-11-06T16:30:00Z'
+
+    ErrorResponse:
+      type: object
+      description: Error payload returned by Spring Boot.
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-11-06T16:30:00Z'
+        status:
+          type: integer
+          example: 404
+        error:
+          type: string
+          example: Not Found
+        path:
+          type: string
+          example: /api/products/999
+        message:
+          type: string
+          description: Present when message inclusion is enabled on the server.
+          example: Product not found
