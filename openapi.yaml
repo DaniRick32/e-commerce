@@ -200,6 +200,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/products/search:
+    get:
+      tags: [Products]
+      summary: Search products
+      description: |
+        Returns the products that match all supplied filters. Every parameter is
+        optional, so calling the endpoint without parameters lists all products.
+
+        - `q` is matched case-insensitively against the product name and description.
+        - `categoryId`, `minPrice` and `maxPrice` narrow the result set.
+        - `minPrice` must be less than or equal to `maxPrice` when both are given.
+
+        Results are ordered by product name, then by id.
+      operationId: searchProducts
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductSearchQuery'
+        - $ref: '#/components/parameters/ProductCategoryFilter'
+        - $ref: '#/components/parameters/ProductMinPrice'
+        - $ref: '#/components/parameters/ProductMaxPrice'
+      responses:
+        '200':
+          description: Products matching the search filters (empty array when nothing matches)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductResponse'
+        '400':
+          description: Invalid price filter (negative value or minPrice greater than maxPrice)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-11-06T16:30:00Z'
+                status: 400
+                error: Bad Request
+                path: /api/products/search
+                message: minPrice must be less than or equal to maxPrice
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/products/{id}:
     parameters:
       - $ref: '#/components/parameters/ProductId'
@@ -295,6 +344,50 @@ components:
         format: int64
         minimum: 1
       example: 1
+
+    ProductSearchQuery:
+      name: q
+      in: query
+      required: false
+      description: Case-insensitive text matched against product name and description.
+      schema:
+        type: string
+      example: mouse
+
+    ProductCategoryFilter:
+      name: categoryId
+      in: query
+      required: false
+      description: Only return products that belong to this category.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 1
+
+    ProductMinPrice:
+      name: minPrice
+      in: query
+      required: false
+      description: Only return products priced at or above this amount.
+      schema:
+        type: number
+        format: double
+        minimum: 0
+        maximum: 99999999.99
+      example: 10.00
+
+    ProductMaxPrice:
+      name: maxPrice
+      in: query
+      required: false
+      description: Only return products priced at or below this amount.
+      schema:
+        type: number
+        format: double
+        minimum: 0
+        maximum: 99999999.99
+      example: 100.00
 
   schemas:
     RegisterRequest:

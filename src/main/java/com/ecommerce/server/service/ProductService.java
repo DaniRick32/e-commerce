@@ -1,5 +1,6 @@
 package com.ecommerce.server.service;
 
+import com.ecommerce.server.cache.ProductSearchCache;
 import com.ecommerce.server.dto.product.ProductRequest;
 import com.ecommerce.server.dto.product.ProductResponse;
 import com.ecommerce.server.dto.product.ProductUpdateRequest;
@@ -11,21 +12,27 @@ import com.ecommerce.server.repository.ProductRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
 public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ProductSearchCache productSearchCache;
 
     public ProductService(
             ProductRepository productRepository,
-            CategoryRepository categoryRepository
+            CategoryRepository categoryRepository,
+            ProductSearchCache productSearchCache
     ) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.productSearchCache = productSearchCache;
     }
 
     public List<ProductResponse> findAll() {
@@ -34,6 +41,53 @@ public class ProductService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    public List<ProductResponse> search(
+            String q,
+            Long categoryId,
+            BigDecimal minPrice,
+            BigDecimal maxPrice
+    ) {
+        if (minPrice != null && minPrice.signum() < 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "minPrice must be zero or greater"
+            );
+        }
+
+        if (maxPrice != null && maxPrice.signum() < 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "maxPrice must be zero or greater"
+            );
+        }
+
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "minPrice must be less than or equal to maxPrice"
+            );
+        }
+
+        String query = q == null || q.isBlank() ? null : q.trim();
+
+        ProductSearchCache.CacheLookup cached =
+                productSearchCache.lookup(query, categoryId, minPrice, maxPrice);
+
+        if (cached.isHit()) {
+            return cached.results();
+        }
+
+        List<ProductResponse> results = productRepository
+                .search(query, categoryId, minPrice, maxPrice)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+        productSearchCache.put(cached.key(), results);
+
+        return results;
     }
 
     @Transactional
@@ -65,7 +119,9 @@ public class ProductService {
                 category
         );
 
-        return toResponse(productRepository.save(product));
+        ProductResponse response = toResponse(productRepository.save(product));
+        invalidateSearchCacheAfterCommit();
+        return response;
     }
 
     @Transactional
@@ -120,7 +176,9 @@ public class ProductService {
             product.setCategory(category);
         }
 
-        return toResponse(productRepository.save(product));
+        ProductResponse response = toResponse(productRepository.save(product));
+        invalidateSearchCacheAfterCommit();
+        return response;
     }
 
     @Transactional
@@ -133,6 +191,26 @@ public class ProductService {
                 ));
 
         productRepository.delete(product);
+        invalidateSearchCacheAfterCommit();
+    }
+
+    /**
+     * Clears cached searches once the surrounding transaction has committed,
+     * so a concurrent search cannot cache the pre-commit state under the new
+     * cache generation.
+     */
+    private void invalidateSearchCacheAfterCommit() {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            productSearchCache.invalidate();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                productSearchCache.invalidate();
+            }
+        });
     }
 
     private ProductResponse toResponse(Product product) {
