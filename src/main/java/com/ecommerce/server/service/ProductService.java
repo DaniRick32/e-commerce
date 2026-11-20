@@ -4,8 +4,10 @@ import com.ecommerce.server.cache.ProductSearchCache;
 import com.ecommerce.server.dto.product.ProductRequest;
 import com.ecommerce.server.dto.product.ProductResponse;
 import com.ecommerce.server.dto.product.ProductUpdateRequest;
+import com.ecommerce.server.entity.Brand;
 import com.ecommerce.server.entity.Category;
 import com.ecommerce.server.entity.Product;
+import com.ecommerce.server.repository.BrandRepository;
 import com.ecommerce.server.repository.CategoryRepository;
 import com.ecommerce.server.repository.ProductRepository;
 
@@ -23,15 +25,18 @@ import java.util.List;
 public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final BrandRepository brandRepository;
     private final ProductSearchCache productSearchCache;
 
     public ProductService(
             ProductRepository productRepository,
             CategoryRepository categoryRepository,
+            BrandRepository brandRepository,
             ProductSearchCache productSearchCache
     ) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.brandRepository = brandRepository;
         this.productSearchCache = productSearchCache;
     }
 
@@ -46,6 +51,7 @@ public class ProductService {
     public List<ProductResponse> search(
             String q,
             Long categoryId,
+            Long brandId,
             BigDecimal minPrice,
             BigDecimal maxPrice
     ) {
@@ -73,14 +79,14 @@ public class ProductService {
         String query = q == null || q.isBlank() ? null : q.trim();
 
         ProductSearchCache.CacheLookup cached =
-                productSearchCache.lookup(query, categoryId, minPrice, maxPrice);
+                productSearchCache.lookup(query, categoryId, brandId, minPrice, maxPrice);
 
         if (cached.isHit()) {
             return cached.results();
         }
 
         List<ProductResponse> results = productRepository
-                .search(query, categoryId, minPrice, maxPrice)
+                .search(query, categoryId, brandId, minPrice, maxPrice)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -88,6 +94,21 @@ public class ProductService {
         productSearchCache.put(cached.key(), results);
 
         return results;
+    }
+
+    public List<ProductResponse> findByBrand(Long brandId) {
+        if (!brandRepository.existsById(brandId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Brand not found"
+            );
+        }
+
+        return productRepository
+                .findByBrandIdOrderByNameAscIdAsc(brandId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional
@@ -111,12 +132,23 @@ public class ProductService {
                     ));
         }
 
+        Brand brand = null;
+        if (request.brandId() != null) {
+            brand = brandRepository
+                    .findById(request.brandId())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Brand not found"
+                    ));
+        }
+
         Product product = new Product(
                 name,
                 request.description(),
                 request.price(),
                 request.stock() == null ? 0 : request.stock(),
-                category
+                category,
+                brand
         );
 
         ProductResponse response = toResponse(productRepository.save(product));
@@ -176,6 +208,17 @@ public class ProductService {
             product.setCategory(category);
         }
 
+        if (request.brandId() != null) {
+            Brand brand = brandRepository
+                    .findById(request.brandId())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Brand not found"
+                    ));
+
+            product.setBrand(brand);
+        }
+
         ProductResponse response = toResponse(productRepository.save(product));
         invalidateSearchCacheAfterCommit();
         return response;
@@ -217,6 +260,8 @@ public class ProductService {
         Long categoryId = product.getCategory() == null ? null : product.getCategory().getId();
         String categoryName = product.getCategory() == null ? null : product.getCategory().getName();
 
+        Brand brand = product.getBrand();
+
         return new ProductResponse(
                 product.getId(),
                 product.getName(),
@@ -225,6 +270,10 @@ public class ProductService {
                 product.getStock(),
                 categoryId,
                 categoryName,
+                brand == null ? null : brand.getId(),
+                brand == null ? null : brand.getName(),
+                brand == null ? null : brand.getCountryOfMade(),
+                brand == null ? null : brand.getRating(),
                 product.getCreatedAt()
         );
     }

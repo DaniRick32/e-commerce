@@ -20,5 +20,7 @@ public record ProductUpdateRequest(
         @Min(value = 0, message = "Stock must be zero or greater")
         Integer stock,
 
-        Long categoryId
+        Long categoryId,
+
+        Long brandId
 ) {}

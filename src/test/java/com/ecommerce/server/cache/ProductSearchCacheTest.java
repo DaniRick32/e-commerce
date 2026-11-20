@@ -54,12 +54,12 @@ class ProductSearchCacheTest {
         when(valueOperations.get(anyString())).thenReturn(null);
 
         ProductSearchCache.CacheLookup lookup =
-                cache.lookup("  Phone ", 7L, new BigDecimal("10.00"), null);
+                cache.lookup("  Phone ", 7L, 2L, new BigDecimal("10.00"), null);
 
         assertFalse(lookup.isHit());
         assertNull(lookup.results());
         assertEquals(
-                "product-search:g0:q=phone:c=7:min=10:max=",
+                "product-search:g0:q=phone:c=7:b=2:min=10:max=",
                 lookup.key()
         );
     }
@@ -74,21 +74,27 @@ class ProductSearchCacheTest {
                 3,
                 7L,
                 "Tech",
+                2L,
+                "Acme",
+                "Japan",
+                new BigDecimal("4.50"),
                 LocalDateTime.of(2026, 1, 2, 3, 4)
         );
         String json = jsonMapper.writeValueAsString(List.of(product));
 
         when(valueOperations.get("product-search:generation")).thenReturn("3");
         when(valueOperations.get(
-                "product-search:g3:q=phone:c=:min=:max="
+                "product-search:g3:q=phone:c=:b=:min=:max="
         )).thenReturn(json);
 
         ProductSearchCache.CacheLookup lookup =
-                cache.lookup("phone", null, null, null);
+                cache.lookup("phone", null, null, null, null);
 
         assertTrue(lookup.isHit());
         assertEquals(1, lookup.results().size());
         assertEquals(1L, lookup.results().get(0).id());
+        assertEquals("Acme", lookup.results().get(0).brandName());
+        assertEquals("Japan", lookup.results().get(0).brandCountryOfMade());
         assertEquals(0, new BigDecimal("9.99").compareTo(lookup.results().get(0).price()));
     }
 
@@ -98,7 +104,7 @@ class ProductSearchCacheTest {
                 .thenThrow(new RedisConnectionFailureException("Redis is down"));
 
         ProductSearchCache.CacheLookup lookup =
-                cache.lookup("phone", null, null, null);
+                cache.lookup("phone", null, null, null, null);
 
         assertFalse(lookup.isHit());
         assertNull(lookup.key());
@@ -114,13 +120,17 @@ class ProductSearchCacheTest {
                 3,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
                 LocalDateTime.of(2026, 1, 2, 3, 4)
         ));
 
-        cache.put("product-search:g0:q=phone:c=:min=:max=", results);
+        cache.put("product-search:g0:q=phone:c=:b=:min=:max=", results);
 
         verify(valueOperations).set(
-                eq("product-search:g0:q=phone:c=:min=:max="),
+                eq("product-search:g0:q=phone:c=:b=:min=:max="),
                 anyString(),
                 eq(TTL)
         );
@@ -139,7 +149,7 @@ class ProductSearchCacheTest {
                 new ProductSearchCache(redisTemplate, jsonMapper, false, TTL);
 
         ProductSearchCache.CacheLookup lookup =
-                disabled.lookup("phone", null, null, null);
+                disabled.lookup("phone", null, null, null, null);
 
         assertFalse(lookup.isHit());
         assertNull(lookup.key());

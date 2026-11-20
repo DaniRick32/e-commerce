@@ -13,12 +13,17 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
 
+    boolean existsByBrandId(Long brandId);
+
+    List<Product> findByBrandIdOrderByNameAscIdAsc(Long brandId);
+
     @Query("""
             SELECT p FROM Product p
             WHERE (:q IS NULL
                    OR LOWER(p.name) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(p.description) LIKE LOWER(CONCAT('%', :q, '%')))
               AND (:categoryId IS NULL OR p.category.id = :categoryId)
+              AND (:brandId IS NULL OR p.brand.id = :brandId)
               AND (:minPrice IS NULL OR p.price >= :minPrice)
               AND (:maxPrice IS NULL OR p.price <= :maxPrice)
             ORDER BY p.name ASC, p.id ASC
@@ -26,6 +31,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> search(
             @Param("q") String q,
             @Param("categoryId") Long categoryId,
+            @Param("brandId") Long brandId,
             @Param("minPrice") BigDecimal minPrice,
             @Param("maxPrice") BigDecimal maxPrice
     );

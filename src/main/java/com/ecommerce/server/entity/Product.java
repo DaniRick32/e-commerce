@@ -28,6 +28,10 @@ public class Product {
     @JoinColumn(name = "category_id")
     private Category category;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "brand_id")
+    private Brand brand;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -38,13 +42,15 @@ public class Product {
             String description,
             BigDecimal price,
             Integer stock,
-            Category category
+            Category category,
+            Brand brand
             ) {
         this.name = name;
         this.description = description;
         this.price = price;
         this.stock = stock;
         this.category = category;
+        this.brand = brand;
     }
 
     @PrePersist
@@ -64,6 +70,7 @@ public class Product {
     public BigDecimal getPrice() { return price; }
     public Integer getStock() { return stock; }
     public Category getCategory() { return category; }
+    public Brand getBrand() { return brand; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 
     public void setId(Long id) { this.id = id; }
@@ -72,5 +79,6 @@ public class Product {
     public void setPrice(BigDecimal price) { this.price = price; }
     public void setStock(Integer stock) { this.stock = stock; }
     public void setCategory(Category category) { this.category = category; }
+    public void setBrand(Brand brand) { this.brand = brand; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

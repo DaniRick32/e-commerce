@@ -32,3 +32,21 @@ Cache settings live in `src/main/resources/application.properties`:
 
 Search results are invalidated automatically when a product is created,
 updated, or deleted.
+
+## Brands
+
+Brands (manufacturers) are managed through `/api/brands`:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/brands` | List all brands |
+| `GET` | `/api/brands/{id}` | Get a single brand |
+| `GET` | `/api/brands/{id}/products` | List the products of a brand |
+| `POST` | `/api/brands` | Create a brand |
+| `PATCH` | `/api/brands/{id}` | Partially update a brand |
+| `DELETE` | `/api/brands/{id}` | Delete a brand (refused while products use it) |
+
+A brand stores its `name`, `countryOfMade`, `rating` (0–5) and `description`.
+Products reference a brand through `brandId`; product responses also include
+`brandName`, `brandCountryOfMade` and `brandRating`. The product search endpoint
+accepts a `brandId` filter alongside the category and price filters.

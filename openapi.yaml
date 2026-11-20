@@ -25,6 +25,8 @@ tags:
     description: Authenticated user profile
   - name: Products
     description: Product catalogue management
+  - name: Brands
+    description: Brand and manufacturer management
 
 paths:
   /api/auth/register:
@@ -209,7 +211,7 @@ paths:
         optional, so calling the endpoint without parameters lists all products.
 
         - `q` is matched case-insensitively against the product name and description.
-        - `categoryId`, `minPrice` and `maxPrice` narrow the result set.
+        - `categoryId`, `brandId`, `minPrice` and `maxPrice` narrow the result set.
         - `minPrice` must be less than or equal to `maxPrice` when both are given.
 
         Results are ordered by product name, then by id.
@@ -219,6 +221,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ProductSearchQuery'
         - $ref: '#/components/parameters/ProductCategoryFilter'
+        - $ref: '#/components/parameters/ProductBrandFilter'
         - $ref: '#/components/parameters/ProductMinPrice'
         - $ref: '#/components/parameters/ProductMaxPrice'
       responses:
@@ -325,6 +328,213 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/brands:
+    get:
+      tags: [Brands]
+      summary: List all brands
+      operationId: getBrands
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Brand list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BrandResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Brands]
+      summary: Create a brand
+      operationId: createBrand
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BrandRequest'
+            example:
+              name: Acme
+              countryOfMade: Japan
+              rating: 4.5
+              description: Consumer electronics manufacturer
+      responses:
+        '201':
+          description: Brand created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A brand with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/brands/{id}:
+    parameters:
+      - $ref: '#/components/parameters/BrandId'
+
+    get:
+      tags: [Brands]
+      summary: Get a brand
+      operationId: getBrand
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Brand
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Brand not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Brands]
+      summary: Partially update a brand
+      description: |
+        Updates only the fields included in the request body.
+        Omitted or `null` fields are left unchanged.
+      operationId: updateBrand
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BrandUpdateRequest'
+            example:
+              rating: 4.8
+      responses:
+        '200':
+          description: Brand updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandResponse'
+        '400':
+          description: Validation failed (for example a blank name or rating above 5)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Brand not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A brand with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Brands]
+      summary: Delete a brand
+      description: Deletion is refused while products still reference the brand.
+      operationId: deleteBrand
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Brand deleted
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Brand not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Brand is still assigned to one or more products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/brands/{id}/products:
+    parameters:
+      - $ref: '#/components/parameters/BrandId'
+
+    get:
+      tags: [Brands]
+      summary: List a brand's products
+      description: Returns every product assigned to the brand, ordered by product name then id.
+      operationId: getBrandProducts
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Products belonging to the brand
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Brand not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -359,6 +569,28 @@ components:
       in: query
       required: false
       description: Only return products that belong to this category.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 1
+
+    ProductBrandFilter:
+      name: brandId
+      in: query
+      required: false
+      description: Only return products made by this brand.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 1
+
+    BrandId:
+      name: id
+      in: path
+      required: true
+      description: Brand identifier
       schema:
         type: integer
         format: int64
@@ -457,6 +689,84 @@ components:
       enum: [USER, ADMIN]
       example: USER
 
+    BrandRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          example: Acme
+        countryOfMade:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: Japan
+        rating:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          maximum: 5
+          description: Brand rating from 0 to 5 with at most 2 decimal places
+          example: 4.5
+        description:
+          type: string
+          nullable: true
+          example: Consumer electronics manufacturer
+
+    BrandUpdateRequest:
+      type: object
+      description: All fields are optional; only provided (non-null) fields are updated.
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          example: Acme
+        countryOfMade:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: Japan
+        rating:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          maximum: 5
+          description: Brand rating from 0 to 5 with at most 2 decimal places
+          example: 4.8
+        description:
+          type: string
+          nullable: true
+          example: Updated description
+
+    BrandResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: Acme
+        countryOfMade:
+          type: string
+          nullable: true
+          example: Japan
+        rating:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          maximum: 5
+          example: 4.5
+        description:
+          type: string
+          nullable: true
+          example: Consumer electronics manufacturer
+
     ProductRequest:
       type: object
       required: [name, price]
@@ -488,6 +798,12 @@ components:
           nullable: true
           description: Existing category id, or null for no category
           example: 1
+        brandId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Existing brand id, or null for no brand
+          example: 1
 
     ProductUpdateRequest:
       type: object
@@ -518,6 +834,12 @@ components:
           format: int64
           nullable: true
           description: Existing category id. Null or omitted leaves the category unchanged.
+          example: 1
+        brandId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Existing brand id. Null or omitted leaves the brand unchanged.
           example: 1
 
     ProductResponse:
@@ -551,6 +873,26 @@ components:
           type: string
           nullable: true
           example: Electronics
+        brandId:
+          type: integer
+          format: int64
+          nullable: true
+          example: 1
+        brandName:
+          type: string
+          nullable: true
+          example: Acme
+        brandCountryOfMade:
+          type: string
+          nullable: true
+          example: Japan
+        brandRating:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          maximum: 5
+          example: 4.5
         createdAt:
           type: string
           format: date-time

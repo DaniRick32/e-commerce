@@ -11,5 +11,9 @@ public record ProductResponse(
         Integer stock,
         Long categoryId,
         String categoryName,
+        Long brandId,
+        String brandName,
+        String brandCountryOfMade,
+        BigDecimal brandRating,
         LocalDateTime createdAt
 ) {}

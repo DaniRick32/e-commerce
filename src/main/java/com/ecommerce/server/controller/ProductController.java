@@ -40,10 +40,11 @@ public class ProductController {
     public List<ProductResponse> searchProducts(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long brandId,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice
     ) {
-        return productService.search(q, categoryId, minPrice, maxPrice);
+        return productService.search(q, categoryId, brandId, minPrice, maxPrice);
     }
 
     @PostMapping

@@ -68,6 +68,7 @@ public class ProductSearchCache {
     public CacheLookup lookup(
             String q,
             Long categoryId,
+            Long brandId,
             BigDecimal minPrice,
             BigDecimal maxPrice
     ) {
@@ -76,7 +77,7 @@ public class ProductSearchCache {
         }
 
         try {
-            String key = buildKey(q, categoryId, minPrice, maxPrice);
+            String key = buildKey(q, categoryId, brandId, minPrice, maxPrice);
             String json = redisTemplate.opsForValue().get(key);
 
             if (json == null) {
@@ -121,6 +122,7 @@ public class ProductSearchCache {
     private String buildKey(
             String q,
             Long categoryId,
+            Long brandId,
             BigDecimal minPrice,
             BigDecimal maxPrice
     ) {
@@ -128,6 +130,7 @@ public class ProductSearchCache {
                 + ":g" + generation()
                 + ":q=" + normalizeQuery(q)
                 + ":c=" + (categoryId == null ? "" : categoryId)
+                + ":b=" + (brandId == null ? "" : brandId)
                 + ":min=" + normalizePrice(minPrice)
                 + ":max=" + normalizePrice(maxPrice);
     }
