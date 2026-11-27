@@ -6,20 +6,51 @@ Development in progress.
 
 ## Running
 
-Product search is cached in Redis. Start it with Docker:
+The app uses PostgreSQL. Product search is cached in Redis. `compose.yaml`
+starts all three containers, including the Spring Boot app built from the
+Dockerfile:
 
 ```bash
-docker compose up -d redis
+docker compose up --build
 ```
 
-Then start the app:
+The API is then available at `http://localhost:8080`. Add `-d` to run in the
+background, and use `docker compose logs -f app` to follow the application
+logs. Compose waits for PostgreSQL and Redis to become healthy before starting
+the app, and connects to them by their Compose service names (`postgres` and
+`redis`). Stop the stack with `docker compose down`.
+
+The defaults in `application.properties` target local host development. For
+that workflow, start only the backing services and run the app from the host:
 
 ```bash
+docker compose up -d postgres redis
 ./mvnw spring-boot:run
 ```
 
-Redis is optional: if it is unreachable, search falls back to the database and
-the app keeps working (cache errors are logged and retried every 30 seconds).
+By default the host-run app connects to
+`jdbc:postgresql://localhost:5432/ecommerce` with the username and password
+`postgres`. Override the connection with the `DB_URL`, `DB_USERNAME` and
+`DB_PASSWORD` environment variables.
+
+Hibernate creates and updates the schema on startup
+(`spring.jpa.hibernate.ddl-auto=update`).
+
+Redis runs in the `redis` Docker container defined in `compose.yaml`; no local
+Redis installation is needed. The container publishes its port on loopback only
+(`127.0.0.1:6380`) because it has no password; port 6380 is used instead of
+6379 so a locally installed Redis can keep running on the default port. This
+published port is for host development, while the containerized app uses the
+internal Compose network (`redis:6379`). To use the container's Redis from a
+host-run app, set `REDIS_HOST=127.0.0.1` and `REDIS_PORT=6380`. Check the
+container with:
+
+```bash
+docker compose exec redis redis-cli ping
+```
+
+If Redis is unreachable, search falls back to the database and the app keeps
+working (cache errors are logged and retried every 30 seconds).
 
 Cache settings live in `src/main/resources/application.properties`:
 
@@ -27,8 +58,8 @@ Cache settings live in `src/main/resources/application.properties`:
 | --- | --- | --- |
 | `app.cache.product-search.enabled` | `true` | Turn the search cache on or off |
 | `app.cache.product-search.ttl` | `60s` | How long cached search results live |
-| `spring.data.redis.host` | `localhost` | Redis host (override with `REDIS_HOST`) |
-| `spring.data.redis.port` | `6379` | Redis port (override with `REDIS_PORT`) |
+| `spring.data.redis.host` | `127.0.0.1` | Redis host; Compose uses `redis` (override with `REDIS_HOST`) |
+| `spring.data.redis.port` | `6379` | Redis port (`6380` when using the container from the host; override with `REDIS_PORT`) |
 
 Search results are invalidated automatically when a product is created,
 updated, or deleted.
